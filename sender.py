@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-IntraMirror OTP Sender - Termux Version
+IntraMirror OTP Sender - Termux Version (Default: +95)
 """
 
 import requests
@@ -19,7 +19,7 @@ DEBUG = False
 # ============================================
 # PROXY CONFIGURATION
 # ============================================
-PROXY = "942fd9a198553847cf8a__cr.eg:1f54ed1d3311298f@gw.dataimpulse.com:823"
+PROXY = "942fd9a198553847cf8a__cr.mm:1f54ed1d3311298f@gw.dataimpulse.com:823"
 USE_PROXY = True  # Set to False to disable proxy
 # ============================================
 
@@ -290,6 +290,7 @@ def get_file_path():
     
     print(f"\n{Colors.CYAN}📝 Enter the path to your number.txt file{Colors.RESET}")
     print(f"{Colors.DIM}💡 Example: /sdcard/Download/number.txt{Colors.RESET}")
+    print(f"{Colors.DIM}💡 Default country code: +95 (Myanmar){Colors.RESET}")
     
     while True:
         file_path = input(f"\n{Colors.YELLOW}📁 Path: {Colors.RESET}").strip()
@@ -321,9 +322,9 @@ def get_file_path():
                 return None
 
 def read_numbers(filename):
-    """Read numbers from file - works exactly like original"""
+    """Read numbers from file - default country code +95"""
     numbers = []
-    default_country = "20"
+    default_country = "95"  # Myanmar
     
     try:
         with open(filename, 'r', encoding='utf-8') as f:
@@ -376,7 +377,7 @@ def main():
         check_termux_storage()
     
     print("\n" + "="*60)
-    print(f"{Colors.CYAN}{Colors.BOLD}  IntraMirror OTP Sender - Termux{Colors.RESET}")
+    print(f"{Colors.CYAN}{Colors.BOLD}  IntraMirror OTP Sender - Termux (+95){Colors.RESET}")
     print("="*60)
     
     if DEBUG:
@@ -388,6 +389,7 @@ def main():
         print(f"{Colors.GREEN}🔗 PROXY: ENABLED{Colors.RESET}")
     else:
         print(f"{Colors.YELLOW}🔗 PROXY: DISABLED{Colors.RESET}")
+    print(f"{Colors.CYAN}📱 Default Country: +95 (Myanmar){Colors.RESET}")
     print("="*60 + "\n")
     
     # Get file path from user
@@ -401,7 +403,8 @@ def main():
     
     if not numbers:
         print(f"{Colors.RED}❌ No valid numbers found{Colors.RESET}")
-        print(f"{Colors.YELLOW}Format: country_code:phone_number (e.g., 20:1234567890){Colors.RESET}")
+        print(f"{Colors.YELLOW}Format: country_code:phone_number (e.g., 95:1234567890){Colors.RESET}")
+        print(f"{Colors.YELLOW}Or just phone number (will use +95 automatically){Colors.RESET}")
         return
     
     print(f"\n{Colors.BLUE}📋 Found {len(numbers)} number(s){Colors.RESET}")
