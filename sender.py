@@ -321,62 +321,34 @@ def get_file_path():
                 return None
 
 def read_numbers(filename):
-    """Read numbers from file with flexible format"""
+    """Read numbers from file - works exactly like original"""
     numbers = []
-    default_country = "20"  # Egypt default
+    default_country = "20"
     
     try:
         with open(filename, 'r', encoding='utf-8') as f:
-            content = f.read()
-            print(f"\n{Colors.DIM}📄 File content preview:{Colors.RESET}")
-            lines_preview = content.split('\n')[:5]
-            for line in lines_preview:
-                if line.strip():
-                    print(f"  {Colors.DIM}{line.strip()}{Colors.RESET}")
-            if len(content.split('\n')) > 5:
-                print(f"  {Colors.DIM}... and more lines{Colors.RESET}")
-            
-            f.seek(0)
-            
-            for line_num, line in enumerate(f, 1):
+            for line in f:
                 line = line.strip()
                 if not line or line.startswith('#'):
                     continue
                 
-                # Check format: with or without country code
                 if ':' in line:
                     parts = line.split(':', 1)
                     country_code = parts[0].strip()
                     phone = parts[1].strip()
                 else:
-                    # If no country code, ask user
-                    print(f"\n{Colors.YELLOW}⚠️ No country code found for: {line}{Colors.RESET}")
-                    use_default = input(f"Use default country code ({default_country})? (y/n): ").lower()
-                    if use_default == 'y':
-                        country_code = default_country
-                        phone = line
-                    else:
-                        country_code = input(f"Enter country code for {line}: ").strip()
-                        phone = line
+                    country_code = default_country
+                    phone = line
                 
-                # Clean phone number
                 phone = re.sub(r'\D', '', phone)
                 
                 if phone and len(phone) >= 5:
                     numbers.append((country_code, phone))
-                else:
-                    print(f"{Colors.RED}⚠️ Line {line_num}: Invalid phone number (min 5 digits){Colors.RESET}")
-                    
     except FileNotFoundError:
-        print(f"{Colors.RED}❌ File not found: {filename}{Colors.RESET}")
-        return []
-    except PermissionError:
-        print(f"{Colors.RED}❌ Permission denied: {filename}{Colors.RESET}")
-        print(f"{Colors.YELLOW}💡 In Termux, make sure you have storage permissions:{Colors.RESET}")
-        print(f"  {Colors.DIM}termux-setup-storage{Colors.RESET}")
+        print(f"{Colors.RED}❌ number.txt not found{Colors.RESET}")
         return []
     except Exception as e:
-        print(f"{Colors.RED}❌ Error reading file: {e}{Colors.RESET}")
+        print(f"{Colors.RED}❌ Error: {e}{Colors.RESET}")
         return []
     
     return numbers
@@ -384,7 +356,6 @@ def read_numbers(filename):
 def check_termux_storage():
     """Check and setup Termux storage if needed"""
     try:
-        # Check if storage directory exists
         storage_path = os.path.expanduser("~/storage")
         if not os.path.exists(storage_path):
             print(f"{Colors.YELLOW}⚠️ Termux storage not set up{Colors.RESET}")
@@ -425,11 +396,11 @@ def main():
         print(f"{Colors.RED}❌ No file selected. Exiting.{Colors.RESET}")
         return
     
-    # Read numbers
+    # Read numbers - works exactly like original
     numbers = read_numbers(filename)
     
     if not numbers:
-        print(f"{Colors.RED}❌ No valid numbers found in file{Colors.RESET}")
+        print(f"{Colors.RED}❌ No valid numbers found{Colors.RESET}")
         print(f"{Colors.YELLOW}Format: country_code:phone_number (e.g., 20:1234567890){Colors.RESET}")
         return
     
@@ -456,29 +427,23 @@ def main():
     
     print(f"\n{Colors.CYAN}⏱️  Using {delay}s delay between requests{Colors.RESET}")
     
-    # Confirmation
-    print(f"\n{Colors.YELLOW}⚠️ Ready to send OTPs to {len(numbers)} numbers{Colors.RESET}")
-    confirm = input(f"Continue? (y/n): ").lower()
-    if confirm != 'y':
-        print(f"{Colors.YELLOW}Cancelled{Colors.RESET}")
-        return
+    print(f"\n{Colors.YELLOW}Starting in 3 seconds... Press Ctrl+C to cancel{Colors.RESET}")
+    for i in range(3, 0, -1):
+        print(f"  {i}...")
+        time.sleep(1)
     
     print(f"\n{Colors.GREEN}▶️ Starting OTP sending...{Colors.RESET}")
     
-    # Process
     start = time.time()
     bot = IntraMirrorSignupBot(delay=delay)
     bot.process_numbers(numbers, filename)
     
     elapsed = time.time() - start
     
-    # Show results
     bot.print_stats()
     if bot.total > 0:
         print(f"\n{Colors.CYAN}⏱️  Time: {elapsed:.2f}s{Colors.RESET}")
         print(f"{Colors.CYAN}📊 Speed: {(bot.total/elapsed):.2f} OTPs/sec{Colors.RESET}")
-    
-    print(f"\n{Colors.GREEN}✅ Done!{Colors.RESET}")
 
 if __name__ == "__main__":
     try:
