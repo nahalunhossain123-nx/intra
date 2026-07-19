@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-IntraMirror OTP Sender - Termux Version (Fixed)
+IntraMirror OTP Sender - Termux Version (+255 Tanzania)
 """
 
 import requests
@@ -316,7 +316,7 @@ def get_file_path():
 
 def read_numbers(filename="number.txt"):
     numbers = []
-    default_country = "95"  # Myanmar
+    default_country = "255"  # Tanzania
     
     try:
         with open(filename, 'r', encoding='utf-8') as f:
@@ -369,7 +369,7 @@ def main():
         check_termux_storage()
     
     print("\n" + "="*60)
-    print(f"{Colors.CYAN}{Colors.BOLD}  IntraMirror OTP Sender - Termux{Colors.RESET}")
+    print(f"{Colors.CYAN}{Colors.BOLD}  IntraMirror OTP Sender - Termux (+255 Tanzania){Colors.RESET}")
     print("="*60)
     if DEBUG:
         print(f"{Colors.YELLOW}🐛 DEBUG MODE: ON{Colors.RESET}")
@@ -380,7 +380,7 @@ def main():
         print(f"{Colors.DIM}   Proxy: {PROXY}{Colors.RESET}")
     else:
         print(f"{Colors.YELLOW}🔗 PROXY: DISABLED{Colors.RESET}")
-    print(f"{Colors.CYAN}📱 Default Country Code: +95 (Myanmar){Colors.RESET}")
+    print(f"{Colors.CYAN}📱 Default Country Code: +255 (Tanzania){Colors.RESET}")
     print("="*60 + "\n")
     
     # Get file path from user
@@ -394,8 +394,8 @@ def main():
     
     if not numbers:
         print(f"{Colors.RED}❌ No valid numbers found{Colors.RESET}")
-        print(f"{Colors.YELLOW}Format: country_code:phone_number (e.g., 95:1234567890){Colors.RESET}")
-        print(f"{Colors.YELLOW}Or just phone number (will use +95 by default){Colors.RESET}")
+        print(f"{Colors.YELLOW}Format: country_code:phone_number (e.g., 255:1234567890){Colors.RESET}")
+        print(f"{Colors.YELLOW}Or just phone number (will use +255 by default){Colors.RESET}")
         return
     
     print(f"{Colors.BLUE}📋 Found {len(numbers)} number(s){Colors.RESET}")
