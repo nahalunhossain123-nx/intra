@@ -19,7 +19,7 @@ DEBUG = False
 # ============================================
 # PROXY CONFIGURATION
 # ============================================
-PROXY = "942fd9a198553847cf8a__cr.mm:1f54ed1d3311298f@gw.dataimpulse.com:823"
+PROXY = "942fd9a198553847cf8a__cr.tz:1f54ed1d3311298f@gw.dataimpulse.com:823"
 USE_PROXY = True  # Set to False to disable proxy
 # ============================================
 
