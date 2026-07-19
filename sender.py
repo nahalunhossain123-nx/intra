@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-IntraMirror OTP Sender - Termux Version (Default: +95)
+IntraMirror OTP Sender - Termux Version (Fixed)
 """
 
 import requests
@@ -53,19 +53,27 @@ class IntraMirrorSignupBot:
         self.success = 0
         self.failed = 0
         
-        # Setup proxy
+        # Setup proxy - EXACTLY like the PC version
         self.proxy = None
         if USE_PROXY and PROXY:
             try:
+                # Parse proxy string
                 proxy_parts = PROXY.split('@')
                 if len(proxy_parts) == 2:
                     auth_part = proxy_parts[0]
                     server_part = proxy_parts[1]
                     
-                    if ':' in auth_part and '__cr.eg' in auth_part:
+                    # Handle different proxy formats
+                    if ':' in auth_part and '__cr.mm' in auth_part:
+                        # Format: username:password@host:port
+                        # Special format: username__cr.mm:password@host:port
                         if ':' in server_part:
                             host, port = server_part.split(':')
-                            if '__cr.eg' in auth_part:
+                            # Find the actual username and password
+                            # The username is everything before the first colon in auth_part
+                            # but we need to handle the special __cr.mm format
+                            if '__cr.mm' in auth_part:
+                                # Special format: username__cr.mm:password
                                 username_parts = auth_part.split(':')
                                 if len(username_parts) >= 2:
                                     username = username_parts[0]
@@ -78,6 +86,7 @@ class IntraMirrorSignupBot:
                                     }
                     
                     if not self.proxy:
+                        # Try simple format: username:password@host:port
                         if ':' in auth_part and ':' in server_part:
                             host, port = server_part.split(':')
                             username, password = auth_part.split(':', 1)
@@ -108,6 +117,7 @@ class IntraMirrorSignupBot:
         }
     
     def debug_print(self, title, data, color=Colors.MAGENTA):
+        """Print debug information if DEBUG is True"""
         if DEBUG:
             print(f"\n{color}{Colors.BOLD}┌─ {title}{Colors.RESET}")
             print(f"{color}│{Colors.RESET}")
@@ -129,6 +139,7 @@ class IntraMirrorSignupBot:
         session = requests.Session()
         session.headers.update(self.headers)
         
+        # Set proxy if configured
         if self.proxy:
             session.proxies.update(self.proxy)
             if DEBUG:
@@ -142,6 +153,7 @@ class IntraMirrorSignupBot:
         
         url = f"{self.base_url}/imapp/new/alisms/send/check/code"
         
+        # Debug: Show request details
         if DEBUG:
             print(f"\n{Colors.CYAN}{Colors.BOLD}📤 REQUEST{Colors.RESET}")
             print(f"{Colors.DIM}URL: {url}{Colors.RESET}")
@@ -154,6 +166,7 @@ class IntraMirrorSignupBot:
         try:
             response = session.post(url, json=payload, timeout=15)
             
+            # Debug: Show response details
             if DEBUG:
                 print(f"\n{Colors.MAGENTA}{Colors.BOLD}📥 RESPONSE{Colors.RESET}")
                 print(f"{Colors.DIM}Status Code: {response.status_code}{Colors.RESET}")
@@ -201,7 +214,7 @@ class IntraMirrorSignupBot:
         finally:
             session.close()
     
-    def remove_number_from_file(self, phone, filename):
+    def remove_number_from_file(self, phone, filename="number.txt"):
         try:
             if not os.path.exists(filename):
                 return
@@ -222,7 +235,7 @@ class IntraMirrorSignupBot:
                 print(f"{Colors.RED}Failed to remove from file: {e}{Colors.RESET}")
             pass
     
-    def process_numbers(self, numbers, filename):
+    def process_numbers(self, numbers, filename="number.txt"):
         total = len(numbers)
         
         print(f"\n{Colors.CYAN}⚡ Processing {total} numbers")
@@ -236,8 +249,10 @@ class IntraMirrorSignupBot:
         print(f"{Colors.RESET}\n")
         
         for idx, (country_code, phone) in enumerate(numbers, 1):
+            # Send OTP
             result = self.send_otp(country_code, phone)
             
+            # Update stats
             self.total += 1
             if result['status'] == 1:
                 self.success += 1
@@ -248,6 +263,7 @@ class IntraMirrorSignupBot:
                 error_msg = result.get('msg', 'Unknown error')[:50]
                 print(f"{Colors.RED}✗ [{idx}/{total}] {result['display']} - {error_msg}{Colors.RESET}")
             
+            # Wait before next request (except after last)
             if idx < total:
                 if DEBUG:
                     print(f"{Colors.DIM}⏳ Waiting {self.delay}s before next request...{Colors.RESET}")
@@ -267,43 +283,20 @@ class IntraMirrorSignupBot:
 def get_file_path():
     """Get file path from user with Termux Android storage support"""
     print("\n" + "="*60)
-    print(f"{Colors.CYAN}{Colors.BOLD}  📂 Termux File Path Helper{Colors.RESET}")
+    print(f"{Colors.CYAN}{Colors.BOLD}  📂 File Path Helper{Colors.RESET}")
     print("="*60)
     
-    # Common Termux storage paths
-    common_paths = [
-        ("Internal Storage Download", "/sdcard/Download/number.txt"),
-        ("Internal Storage Download (alt)", "/storage/emulated/0/Download/number.txt"),
-        ("Termux Home", "~/number.txt"),
-        ("Termux Storage Download", "~/storage/downloads/number.txt"),
-        ("Custom Path", "custom")
-    ]
-    
-    print(f"\n{Colors.YELLOW}Common storage paths:{Colors.RESET}")
-    for i, (name, path) in enumerate(common_paths, 1):
-        if path != "custom":
-            expanded = os.path.expanduser(path)
-            exists = "✅" if os.path.exists(expanded) else "❌"
-            print(f"  {Colors.BLUE}{i}.{Colors.RESET} {name}: {Colors.DIM}{path}{Colors.RESET} {exists}")
-        else:
-            print(f"  {Colors.BLUE}{i}.{Colors.RESET} {name}")
-    
+    # Ask for file path
     print(f"\n{Colors.CYAN}📝 Enter the path to your number.txt file{Colors.RESET}")
     print(f"{Colors.DIM}💡 Example: /sdcard/Download/number.txt{Colors.RESET}")
-    print(f"{Colors.DIM}💡 Default country code: +95 (Myanmar){Colors.RESET}")
+    print(f"{Colors.DIM}💡 Or just press Enter for default: number.txt in current directory{Colors.RESET}")
     
     while True:
-        file_path = input(f"\n{Colors.YELLOW}📁 Path: {Colors.RESET}").strip()
+        file_path = input(f"\n{Colors.YELLOW}📁 Path [default: number.txt]: {Colors.RESET}").strip()
         
-        # Handle shortcut input (just the number)
-        if file_path.isdigit():
-            idx = int(file_path) - 1
-            if 0 <= idx < len(common_paths):
-                path = common_paths[idx][1]
-                if path == "custom":
-                    file_path = input(f"{Colors.YELLOW}📁 Enter custom path: {Colors.RESET}").strip()
-                else:
-                    file_path = path
+        # Use default if empty
+        if not file_path:
+            file_path = "number.txt"
         
         # Expand user path (~)
         file_path = os.path.expanduser(file_path)
@@ -321,8 +314,7 @@ def get_file_path():
             if retry != 'y':
                 return None
 
-def read_numbers(filename):
-    """Read numbers from file - default country code +95"""
+def read_numbers(filename="number.txt"):
     numbers = []
     default_country = "95"  # Myanmar
     
@@ -346,7 +338,7 @@ def read_numbers(filename):
                 if phone and len(phone) >= 5:
                     numbers.append((country_code, phone))
     except FileNotFoundError:
-        print(f"{Colors.RED}❌ number.txt not found{Colors.RESET}")
+        print(f"{Colors.RED}❌ {filename} not found{Colors.RESET}")
         return []
     except Exception as e:
         print(f"{Colors.RED}❌ Error: {e}{Colors.RESET}")
@@ -377,19 +369,18 @@ def main():
         check_termux_storage()
     
     print("\n" + "="*60)
-    print(f"{Colors.CYAN}{Colors.BOLD}  IntraMirror OTP Sender - Termux (+95){Colors.RESET}")
+    print(f"{Colors.CYAN}{Colors.BOLD}  IntraMirror OTP Sender - Termux{Colors.RESET}")
     print("="*60)
-    
     if DEBUG:
         print(f"{Colors.YELLOW}🐛 DEBUG MODE: ON{Colors.RESET}")
     else:
         print(f"{Colors.DIM}🔇 DEBUG MODE: OFF (Set DEBUG=True for details){Colors.RESET}")
-    
     if USE_PROXY and PROXY:
         print(f"{Colors.GREEN}🔗 PROXY: ENABLED{Colors.RESET}")
+        print(f"{Colors.DIM}   Proxy: {PROXY}{Colors.RESET}")
     else:
         print(f"{Colors.YELLOW}🔗 PROXY: DISABLED{Colors.RESET}")
-    print(f"{Colors.CYAN}📱 Default Country: +95 (Myanmar){Colors.RESET}")
+    print(f"{Colors.CYAN}📱 Default Country Code: +95 (Myanmar){Colors.RESET}")
     print("="*60 + "\n")
     
     # Get file path from user
@@ -398,26 +389,19 @@ def main():
         print(f"{Colors.RED}❌ No file selected. Exiting.{Colors.RESET}")
         return
     
-    # Read numbers - works exactly like original
+    # Read numbers - EXACTLY like the PC version
     numbers = read_numbers(filename)
     
     if not numbers:
         print(f"{Colors.RED}❌ No valid numbers found{Colors.RESET}")
         print(f"{Colors.YELLOW}Format: country_code:phone_number (e.g., 95:1234567890){Colors.RESET}")
-        print(f"{Colors.YELLOW}Or just phone number (will use +95 automatically){Colors.RESET}")
+        print(f"{Colors.YELLOW}Or just phone number (will use +95 by default){Colors.RESET}")
         return
     
-    print(f"\n{Colors.BLUE}📋 Found {len(numbers)} number(s){Colors.RESET}")
+    print(f"{Colors.BLUE}📋 Found {len(numbers)} number(s){Colors.RESET}")
     
-    # Show first few numbers
-    print(f"\n{Colors.DIM}First 5 numbers:{Colors.RESET}")
-    for idx, (country, phone) in enumerate(numbers[:5], 1):
-        print(f"  {idx}. +{country} {phone}")
-    if len(numbers) > 5:
-        print(f"  {Colors.DIM}... and {len(numbers)-5} more{Colors.RESET}")
-    
-    # Get delay
     print(f"\n{Colors.YELLOW}Configure Delay:{Colors.RESET}")
+    
     while True:
         try:
             delay = float(input(f"Delay between requests in seconds (0.01-5) [default: 0.5]: ").strip() or "0.5")
@@ -429,6 +413,12 @@ def main():
             break
     
     print(f"\n{Colors.CYAN}⏱️  Using {delay}s delay between requests{Colors.RESET}")
+    
+    print(f"\n{Colors.BLUE}Numbers to process:{Colors.RESET}")
+    for idx, (country, phone) in enumerate(numbers[:10], 1):
+        print(f"  {idx}. +{country} {phone}")
+    if len(numbers) > 10:
+        print(f"  ... and {len(numbers)-10} more")
     
     print(f"\n{Colors.YELLOW}Starting in 3 seconds... Press Ctrl+C to cancel{Colors.RESET}")
     for i in range(3, 0, -1):
@@ -454,6 +444,3 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print(f"\n\n{Colors.YELLOW}⚠️ Interrupted by user{Colors.RESET}")
         sys.exit(0)
-    except Exception as e:
-        print(f"\n{Colors.RED}❌ Error: {e}{Colors.RESET}")
-        sys.exit(1)
