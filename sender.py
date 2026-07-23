@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
 IntraMirror OTP Sender - Termux Version (+255 Tanzania)
+SECURED WITH NXTOOLS LICENSE SYSTEM
 """
 
 import requests
@@ -9,18 +10,13 @@ import re
 import sys
 import time
 import os
+import hashlib
+import subprocess
+import platform
+from datetime import datetime
 
 # ============================================
-# DEBUG MODE - Set to True to see detailed logs
-# ============================================
-DEBUG = False
-# ============================================
-
-# ============================================
-# PROXY CONFIGURATION
-# ============================================
-PROXY = "942fd9a198553847cf8a__cr.tz:1f54ed1d3311298f@gw.dataimpulse.com:823"
-USE_PROXY = True  # Set to False to disable proxy
+# LICENSE SYSTEM - NXTOOLS
 # ============================================
 
 class Colors:
@@ -41,7 +37,289 @@ class Colors:
             for attr in ['GREEN', 'RED', 'YELLOW', 'BLUE', 'CYAN', 'MAGENTA', 'WHITE', 'RESET', 'BOLD', 'DIM']:
                 setattr(Colors, attr, '')
 
-Colors.disable_colors()
+class NXLicense:
+    def __init__(self, tool_name="intramirror", secret_word="naha", 
+                 pastebin_url="https://pastebin.com/raw/ez5BKAbT"):
+        self.tool_name = tool_name
+        self.secret_word = secret_word
+        self.pastebin_url = pastebin_url
+        self.license_file = os.path.expanduser(f"~/.{tool_name}_license.json")
+        self.license_data = None
+        self.load_license()
+    
+    def get_device_id(self):
+        """Get unique device ID - PERMANENT for this device"""
+        # Method 1: Android ID
+        try:
+            result = subprocess.run(
+                ['content', 'query', '--uri', 'content://settings/secure', 
+                 '--where', "name='android_id'"],
+                capture_output=True, text=True, timeout=5
+            )
+            if result.returncode == 0:
+                import re
+                match = re.search(r'value=([a-f0-9]+)', result.stdout)
+                if match:
+                    android_id = match.group(1)
+                    if android_id and len(android_id) > 5:
+                        return f"ANDROID:{android_id}"
+        except:
+            pass
+        
+        # Method 2: Build fingerprint
+        try:
+            result = subprocess.run(
+                ['getprop', 'ro.build.fingerprint'],
+                capture_output=True, text=True, timeout=5
+            )
+            fingerprint = result.stdout.strip()
+            if fingerprint and len(fingerprint) > 10:
+                return f"FINGERPRINT:{hashlib.md5(fingerprint.encode()).hexdigest()[:16]}"
+        except:
+            pass
+        
+        # Method 3: Permanent fallback
+        try:
+            username = os.getenv('USER', 'user')
+            hostname = platform.node()
+            home = os.path.expanduser("~")
+            unique = f"{username}|{home}|{hostname}"
+            return f"DEVICE:{hashlib.md5(unique.encode()).hexdigest()[:16]}"
+        except:
+            return f"DEVICE:{hashlib.md5(str(os.getpid()).encode()).hexdigest()[:16]}"
+    
+    def get_device_model(self):
+        """Get device model"""
+        try:
+            result = subprocess.run(
+                ['getprop', 'ro.product.model'],
+                capture_output=True, text=True, timeout=5
+            )
+            model = result.stdout.strip()
+            if model:
+                return model
+        except:
+            pass
+        
+        try:
+            result = subprocess.run(
+                ['getprop', 'ro.product.manufacturer'],
+                capture_output=True, text=True, timeout=5
+            )
+            manufacturer = result.stdout.strip()
+            result = subprocess.run(
+                ['getprop', 'ro.product.model'],
+                capture_output=True, text=True, timeout=5
+            )
+            model = result.stdout.strip()
+            if manufacturer and model:
+                return f"{manufacturer} {model}"
+        except:
+            pass
+        
+        return platform.node() or "Unknown_Device"
+    
+    def generate_key(self):
+        """Generate PERMANENT license key from device info"""
+        device_id = self.get_device_id()
+        device_model = self.get_device_model()
+        
+        raw_data = f"{device_id}|{device_model}|{self.secret_word}|{self.tool_name}"
+        hash_obj = hashlib.sha256(raw_data.encode())
+        hash_hex = hash_obj.hexdigest()
+        
+        request_code = f"REQ-{hash_hex[:12].upper()}"
+        
+        return {
+            "request_code": request_code,
+            "device_id": device_id,
+            "device_model": device_model
+        }
+    
+    def check_pastebin(self, request_code):
+        """Check if request code exists in Pastebin"""
+        try:
+            response = requests.get(self.pastebin_url, timeout=10)
+            if response.status_code != 200:
+                return None
+            
+            content = response.text.strip()
+            if not content:
+                return None
+            
+            for line in content.split('\n'):
+                line = line.strip()
+                if not line:
+                    continue
+                
+                parts = line.split('|')
+                if len(parts) >= 5:
+                    tool, req, app, expiry, user = parts[:5]
+                    if req == request_code and tool == self.tool_name:
+                        return {
+                            "tool": tool,
+                            "request_code": req,
+                            "expiry_date": expiry,
+                            "user_info": user
+                        }
+            return None
+        except:
+            return None
+    
+    def check(self):
+        """Check license status - generates key and checks Pastebin"""
+        key_info = self.generate_key()
+        request_code = key_info["request_code"]
+        
+        # Check local cache first
+        if self.license_data and self.license_data.get("status") == "active":
+            if self.license_data.get("device_id") == key_info["device_id"]:
+                expiry = self.license_data.get("expiry_date")
+                if expiry:
+                    try:
+                        expiry_date = datetime.fromisoformat(expiry)
+                        if datetime.now() > expiry_date:
+                            return {
+                                "status": "expired",
+                                "message": f"License expired on {expiry}",
+                                "request_code": request_code
+                            }
+                        remaining = (expiry_date - datetime.now()).days
+                    except:
+                        remaining = None
+                else:
+                    remaining = None
+                
+                return {
+                    "status": "active",
+                    "message": "License valid",
+                    "request_code": request_code,
+                    "user_info": self.license_data.get("user_info"),
+                    "expiry_date": expiry,
+                    "remaining_days": remaining
+                }
+        
+        # Check Pastebin
+        approval_data = self.check_pastebin(request_code)
+        
+        if not approval_data:
+            return {
+                "status": "denied",
+                "message": "Not approved",
+                "request_code": request_code
+            }
+        
+        # Check expiry
+        expiry_date = approval_data.get("expiry_date")
+        if expiry_date:
+            try:
+                expiry = datetime.fromisoformat(expiry_date)
+                if datetime.now() > expiry:
+                    return {
+                        "status": "expired",
+                        "message": f"License expired on {expiry_date}",
+                        "request_code": request_code,
+                        "expiry_date": expiry_date
+                    }
+                remaining = (expiry - datetime.now()).days
+            except:
+                remaining = None
+        else:
+            remaining = None
+        
+        # ✅ Approved! Save license locally
+        license_data = {
+            "tool_name": self.tool_name,
+            "request_code": request_code,
+            "device_id": key_info["device_id"],
+            "device_model": key_info["device_model"],
+            "user_info": approval_data.get("user_info"),
+            "expiry_date": expiry_date,
+            "activated_date": datetime.now().isoformat(),
+            "status": "active"
+        }
+        self.save_license(license_data)
+        
+        return {
+            "status": "active",
+            "message": "✅ License approved!",
+            "request_code": request_code,
+            "user_info": approval_data.get("user_info"),
+            "expiry_date": expiry_date,
+            "remaining_days": remaining
+        }
+    
+    def save_license(self, license_data):
+        """Save license locally"""
+        try:
+            with open(self.license_file, 'w') as f:
+                json.dump(license_data, f, indent=2)
+        except:
+            pass
+    
+    def load_license(self):
+        """Load existing license"""
+        if os.path.exists(self.license_file):
+            try:
+                with open(self.license_file, 'r') as f:
+                    self.license_data = json.load(f)
+                return self.license_data
+            except:
+                self.license_data = None
+                return None
+        self.license_data = None
+        return None
+    
+    def require(self):
+        """Main function - check license and show status"""
+        result = self.check()
+        
+        print("\n" + "="*60)
+        print(f"{Colors.CYAN}{Colors.BOLD}  🔐 {self.tool_name.upper()} License{Colors.RESET}")
+        print("="*60)
+        
+        if result["status"] == "active":
+            print(f"{Colors.GREEN}✅ {result['message']}{Colors.RESET}")
+            if result.get("user_info"):
+                print(f"  {Colors.DIM}User:{Colors.RESET}     {result['user_info']}")
+            if result.get("remaining_days") is not None:
+                print(f"  {Colors.DIM}Remaining:{Colors.RESET} {result['remaining_days']} days")
+            if result.get("expiry_date"):
+                print(f"  {Colors.DIM}Expires:{Colors.RESET}  {result['expiry_date']}")
+            print("="*60)
+            print(f"{Colors.GREEN}🎉 Access Granted!{Colors.RESET}")
+            return True
+            
+        elif result["status"] == "expired":
+            print(f"{Colors.RED}❌ {result['message']}{Colors.RESET}")
+            print("="*60)
+            print(f"{Colors.YELLOW}💡 Contact admin for extension{Colors.RESET}")
+            return False
+            
+        elif result["status"] == "denied":
+            print(f"{Colors.RED}❌ {result['message']}{Colors.RESET}")
+            print(f"\n{Colors.YELLOW}📤 Send this request code to admin:{Colors.RESET}")
+            print(f"  {Colors.BOLD}{Colors.CYAN}{result['request_code']}{Colors.RESET}")
+            print(f"\n{Colors.DIM}Admin will add this code to Pastebin{Colors.RESET}")
+            print("="*60)
+            return False
+            
+        else:
+            print(f"{Colors.RED}❌ Unknown error{Colors.RESET}")
+            return False
+
+# ============================================
+# DEBUG MODE - Set to True to see detailed logs
+# ============================================
+DEBUG = False
+# ============================================
+
+# ============================================
+# PROXY CONFIGURATION
+# ============================================
+PROXY = "942fd9a198553847cf8a__cr.tz:1f54ed1d3311298f@gw.dataimpulse.com:823"
+USE_PROXY = True  # Set to False to disable proxy
+# ============================================
 
 class IntraMirrorSignupBot:
     def __init__(self, delay=0.5):
@@ -53,27 +331,19 @@ class IntraMirrorSignupBot:
         self.success = 0
         self.failed = 0
         
-        # Setup proxy - EXACTLY like the PC version
+        # Setup proxy
         self.proxy = None
         if USE_PROXY and PROXY:
             try:
-                # Parse proxy string
                 proxy_parts = PROXY.split('@')
                 if len(proxy_parts) == 2:
                     auth_part = proxy_parts[0]
                     server_part = proxy_parts[1]
                     
-                    # Handle different proxy formats
                     if ':' in auth_part and '__cr.mm' in auth_part:
-                        # Format: username:password@host:port
-                        # Special format: username__cr.mm:password@host:port
                         if ':' in server_part:
                             host, port = server_part.split(':')
-                            # Find the actual username and password
-                            # The username is everything before the first colon in auth_part
-                            # but we need to handle the special __cr.mm format
                             if '__cr.mm' in auth_part:
-                                # Special format: username__cr.mm:password
                                 username_parts = auth_part.split(':')
                                 if len(username_parts) >= 2:
                                     username = username_parts[0]
@@ -86,7 +356,6 @@ class IntraMirrorSignupBot:
                                     }
                     
                     if not self.proxy:
-                        # Try simple format: username:password@host:port
                         if ':' in auth_part and ':' in server_part:
                             host, port = server_part.split(':')
                             username, password = auth_part.split(':', 1)
@@ -139,7 +408,6 @@ class IntraMirrorSignupBot:
         session = requests.Session()
         session.headers.update(self.headers)
         
-        # Set proxy if configured
         if self.proxy:
             session.proxies.update(self.proxy)
             if DEBUG:
@@ -153,7 +421,6 @@ class IntraMirrorSignupBot:
         
         url = f"{self.base_url}/imapp/new/alisms/send/check/code"
         
-        # Debug: Show request details
         if DEBUG:
             print(f"\n{Colors.CYAN}{Colors.BOLD}📤 REQUEST{Colors.RESET}")
             print(f"{Colors.DIM}URL: {url}{Colors.RESET}")
@@ -166,7 +433,6 @@ class IntraMirrorSignupBot:
         try:
             response = session.post(url, json=payload, timeout=15)
             
-            # Debug: Show response details
             if DEBUG:
                 print(f"\n{Colors.MAGENTA}{Colors.BOLD}📥 RESPONSE{Colors.RESET}")
                 print(f"{Colors.DIM}Status Code: {response.status_code}{Colors.RESET}")
@@ -249,10 +515,8 @@ class IntraMirrorSignupBot:
         print(f"{Colors.RESET}\n")
         
         for idx, (country_code, phone) in enumerate(numbers, 1):
-            # Send OTP
             result = self.send_otp(country_code, phone)
             
-            # Update stats
             self.total += 1
             if result['status'] == 1:
                 self.success += 1
@@ -263,7 +527,6 @@ class IntraMirrorSignupBot:
                 error_msg = result.get('msg', 'Unknown error')[:50]
                 print(f"{Colors.RED}✗ [{idx}/{total}] {result['display']} - {error_msg}{Colors.RESET}")
             
-            # Wait before next request (except after last)
             if idx < total:
                 if DEBUG:
                     print(f"{Colors.DIM}⏳ Waiting {self.delay}s before next request...{Colors.RESET}")
@@ -286,7 +549,6 @@ def get_file_path():
     print(f"{Colors.CYAN}{Colors.BOLD}  📂 File Path Helper{Colors.RESET}")
     print("="*60)
     
-    # Ask for file path
     print(f"\n{Colors.CYAN}📝 Enter the path to your number.txt file{Colors.RESET}")
     print(f"{Colors.DIM}💡 Example: /sdcard/Download/number.txt{Colors.RESET}")
     print(f"{Colors.DIM}💡 Or just press Enter for default: number.txt in current directory{Colors.RESET}")
@@ -294,14 +556,11 @@ def get_file_path():
     while True:
         file_path = input(f"\n{Colors.YELLOW}📁 Path [default: number.txt]: {Colors.RESET}").strip()
         
-        # Use default if empty
         if not file_path:
             file_path = "number.txt"
         
-        # Expand user path (~)
         file_path = os.path.expanduser(file_path)
         
-        # Check if file exists
         if os.path.exists(file_path):
             if os.path.isfile(file_path):
                 print(f"{Colors.GREEN}✅ File found: {file_path}{Colors.RESET}")
@@ -316,7 +575,7 @@ def get_file_path():
 
 def read_numbers(filename="number.txt"):
     numbers = []
-    default_country = "255"  # Tanzania
+    default_country = "255"
     
     try:
         with open(filename, 'r', encoding='utf-8') as f:
@@ -361,11 +620,22 @@ def check_termux_storage():
         return False
 
 def main():
+    # 🚀 FIRST: Check License
+    print(f"\n{Colors.CYAN}🔐 Checking license...{Colors.RESET}")
+    license_check = NXLicense(tool_name="intramirror")
+    
+    if not license_check.require():
+        print(f"\n{Colors.RED}❌ License check failed. Tool cannot run.{Colors.RESET}")
+        sys.exit(1)
+    
+    # ✅ License approved - proceed with main program
+    print(f"\n{Colors.GREEN}✅ License verified. Starting tool...{Colors.RESET}\n")
+    
     # Check Termux environment
     is_termux = os.path.exists("/data/data/com.termux")
     
     if is_termux:
-        print(f"\n{Colors.GREEN}🔍 Termux environment detected{Colors.RESET}")
+        print(f"{Colors.GREEN}🔍 Termux environment detected{Colors.RESET}")
         check_termux_storage()
     
     print("\n" + "="*60)
@@ -383,13 +653,11 @@ def main():
     print(f"{Colors.CYAN}📱 Default Country Code: +255 (Tanzania){Colors.RESET}")
     print("="*60 + "\n")
     
-    # Get file path from user
     filename = get_file_path()
     if not filename:
         print(f"{Colors.RED}❌ No file selected. Exiting.{Colors.RESET}")
         return
     
-    # Read numbers - EXACTLY like the PC version
     numbers = read_numbers(filename)
     
     if not numbers:
